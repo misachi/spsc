@@ -75,3 +75,47 @@ func (spsc *SPSCQueue) IsFull() bool {
 func (spsc *SPSCQueue) IsEmpty() bool {
 	return spsc.head.Load() == spsc.tail.Load()
 }
+
+func main() {
+	elemSize := 100000
+	q_size := 4000
+	queue := NewSPSCQueue(int64(q_size))
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < elemSize; i++ {
+			if !queue.Push(i) {
+				fmt.Println("Unable to add to queue")
+				i -= 1 // Ensure to always push. Remove if it's okay to loose items
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		total := 0
+		for {
+			// Wait for producer to add to queue
+			// Tweak sleep duration to get the best waiting time
+			if queue.IsEmpty() {
+				time.Sleep(100 * time.Microsecond)
+			}
+
+			elem, err := queue.Pop()
+			if err != nil {
+				fmt.Printf("%v\n", err)
+				break
+			}
+			if elem != nil {
+				total += elem.(int)
+			}
+
+		}
+		fmt.Printf("End: %v\n", total)
+	}()
+
+	wg.Wait()
+}
